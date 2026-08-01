@@ -1,0 +1,50 @@
+{
+  "name": "podcast",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "ai": {
+    "binding": "AI"
+  },
+  "triggers": {
+    "crons": ["0 9 * * *"]
+  },
+  "r2_buckets": [
+    {
+      "binding": "PODCAST_BUCKET",
+      "bucket_name": "creature-clash-podcast"
+    }
+  ],
+  "vars": {
+    "SHOW_NAME": "Daily Creature Clash",
+    "SHOW_AUTHOR": "Daily Creature Clash",
+    "SHOW_SITE_URL": "https://pokepod.stluker.com",
+    "R2_PUBLIC_BASE_URL": "https://pokepod.stluker.com",
+    "COVER_IMAGE_KEY": "cover.jpg",
+    "PLAY_BY_PLAY_VOICE_ID": "34lPwSZ54D8fWbX1aHzk",
+    "COLOR_COMMENTARY_VOICE_ID": "kWjdIkuzqBCnHbyAOYlF"
+  },
+  // Observability was partially enabled via the dashboard (Logs only --
+  // Traces was still Disabled here, unlike stl-dispatcher where both got
+  // flipped) during the Aug 1-2 invocation-overload investigation. This
+  // Worker was found to be regenerating an episode inside stl-dispatcher's
+  // chained run WITHOUT its own includeCreatureClash flag being set --
+  // suspected day-of-week gate that always evaluates true -- separately from
+  // whatever CPU-time investigation is happening on stl-dispatcher itself.
+  // Declared here explicitly, both logs and traces, so a future
+  // `wrangler deploy` from this file can't silently revert either back to
+  // disabled -- same drift the orange "update your Wrangler config" banner
+  // was warning about.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  }
+}
