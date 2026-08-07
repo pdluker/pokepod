@@ -24,8 +24,6 @@ const ASSUMED_BITRATE_KBPS = 128;
 // both live in the same ledger; the difference only matters when building
 // the exclude Sets below.
 const WINDOWS = {
-  habitats: 8, behaviors: 6, traits: 6, powers: 6, renownLevels: 4,
-  bodyTypes: 6, facialFeatures: 6, distinctiveFeatures: 6, colorPatterns: 6,
   arenaNames: 10,
   trainerBackgrounds: 8, trainerStyles: 4, trainerQuirks: 4, trainerHometowns: 4,
   coldOpens: 4, victoryLines: 4, victoryColorNotes: 3, signoffAsides: 3,
@@ -86,35 +84,9 @@ async function runRefresh(env) {
   const recentFlavor = await readJsonFromR2(env.PODCAST_BUCKET, RECENT_FLAVOR_KEY, {});
 
   // Build exclude sets for creature A straight from history.
-  const creatureExcludeA = {
-    habitats: toSet(recentFlavor.habitats),
-    behaviors: toSet(recentFlavor.behaviors),
-    traits: toSet(recentFlavor.traits),
-    powers: toSet(recentFlavor.powers),
-    renownLevels: toSet(recentFlavor.renownLevels),
-    bodyTypes: toSet(recentFlavor.bodyTypes),
-    facialFeatures: toSet(recentFlavor.facialFeatures),
-    distinctiveFeatures: toSet(recentFlavor.distinctiveFeatures),
-    colorPatterns: toSet(recentFlavor.colorPatterns)
-  };
-  const creatureA = generateCreature(creatureExcludeA);
-
-  // Creature B excludes everything A excluded, PLUS whatever A just picked -
-  // this is what actually fixes the "Neorex re-uses Flamedrake's exact
-  // habitat in the same episode" bug: same-episode exclusion, not just
-  // cross-episode.
-  const creatureExcludeB = {
-    habitats: new Set([...creatureExcludeA.habitats, creatureA.habitat]),
-    behaviors: new Set([...creatureExcludeA.behaviors, creatureA.behavior]),
-    traits: new Set([...creatureExcludeA.traits, creatureA.trait]),
-    powers: new Set([...creatureExcludeA.powers, creatureA.power]),
-    renownLevels: new Set([...creatureExcludeA.renownLevels, creatureA.renown]),
-    bodyTypes: new Set([...creatureExcludeA.bodyTypes, creatureA.bodyType]),
-    facialFeatures: new Set([...creatureExcludeA.facialFeatures, creatureA.facialFeature]),
-    distinctiveFeatures: new Set([...creatureExcludeA.distinctiveFeatures, creatureA.distinctiveFeature]),
-    colorPatterns: new Set([...creatureExcludeA.colorPatterns, creatureA.colorPattern])
-  };
-  const creatureB = generateCreature(creatureExcludeB);
+const recentNames = new Set(recentFlavor.recentCreatureNames || []);
+const creatureA = generateCreature(recentNames);
+const creatureB = generateCreature(new Set([...recentNames, creatureA.name]));
 
   const battleResult = simulateBattle(creatureA, creatureB);
 
@@ -252,15 +224,6 @@ async function runRefresh(env) {
   // categories record both creatures' picks; index-based categories record
   // whatever buildEpisodeScript reports it used.
   const nextFlavor = {
-    habitats: pushWindow(recentFlavor.habitats, creatureA.habitat, WINDOWS.habitats),
-    behaviors: pushWindow(recentFlavor.behaviors, creatureA.behavior, WINDOWS.behaviors),
-    traits: pushWindow(recentFlavor.traits, creatureA.trait, WINDOWS.traits),
-    powers: pushWindow(recentFlavor.powers, creatureA.power, WINDOWS.powers),
-    renownLevels: pushWindow(recentFlavor.renownLevels, creatureA.renown, WINDOWS.renownLevels),
-    bodyTypes: pushWindow(recentFlavor.bodyTypes, creatureA.bodyType, WINDOWS.bodyTypes),
-    facialFeatures: pushWindow(recentFlavor.facialFeatures, creatureA.facialFeature, WINDOWS.facialFeatures),
-    distinctiveFeatures: pushWindow(recentFlavor.distinctiveFeatures, creatureA.distinctiveFeature, WINDOWS.distinctiveFeatures),
-    colorPatterns: pushWindow(recentFlavor.colorPatterns, creatureA.colorPattern, WINDOWS.colorPatterns),
     arenaNames: pushWindow(recentFlavor.arenaNames, arena.name, WINDOWS.arenaNames),
     trainerBackgrounds: pushWindow(recentFlavor.trainerBackgrounds, trainerA.background, WINDOWS.trainerBackgrounds),
     trainerStyles: pushWindow(recentFlavor.trainerStyles, trainerA.style, WINDOWS.trainerStyles),
@@ -279,13 +242,13 @@ async function runRefresh(env) {
       : (recentFlavor.fightHypeTaglines || []),
     doubleKOTaglines: usedIndices.doubleKOTaglines != null
       ? pushWindow(recentFlavor.doubleKOTaglines, usedIndices.doubleKOTaglines, WINDOWS.doubleKOTaglines)
-      : (recentFlavor.doubleKOTaglines || [])
+      : (recentFlavor.doubleKOTaglines || []),
+    recentCreatureNames: pushWindow(recentFlavor.recentCreatureNames, creatureA.name, 20)
   };
   await env.PODCAST_BUCKET.put(RECENT_FLAVOR_KEY, JSON.stringify(nextFlavor, null, 2), {
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-cache' }
   });
-
-  const feedUrl = `${env.R2_PUBLIC_BASE_URL}/${FEED_KEY}`;
+const feedUrl = `${env.R2_PUBLIC_BASE_URL}/${FEED_KEY}`;
   const showMeta = {
     title: env.SHOW_NAME || 'Daily Creature Clash',
     description: 'A daily randomized creature battle, with full commentary - new episode every day.',

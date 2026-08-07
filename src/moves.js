@@ -1,22 +1,18 @@
 // moves.js
-const MOVES_BY_TYPE = {
-  Fire: ["Infernal Cataclysm", "Pyroclastic Volley", "Flameburst Surge", "Solar Ignition"],
-  Water: ["Hydro-Tectonic Crush", "Abyssal Deluge", "Tidal Surge", "Maelstrom Pulse"],
-  Grass: ["Verdant Overgrowth", "Sylvan Thorn-Storm", "Bio-Drain Whip", "Solarbeam Cannon"],
-  Electric: ["Gigawatt Thunderfall", "Plasma Arc Flash", "Volt Disruptor", "Lightning Overcharge"],
-  Ice: ["Absolute Zero Blast", "Glacial Avalanche", "Frostbite Piercer", "Cryo-Shard Barrage"],
-  Fighting: ["Sub-Atomic Palm Strike", "Tectonic Shatter-Kick", "Seismic Impact", "Iron-Fist Blitz"],
-  Poison: ["Venomous Bio-Hazard", "Toxic Neuro-Spike", "Acidic Vapor Burst", "Miasma Pulse"],
-  Ground: ["Faultline Fracture", "Earth-Shatter Tremor", "Dust-Devil Cyclone", "Mud-Slide Impact"],
-  Flying: ["Hurricane Cyclone", "Supersonic Dive-Bomb", "Gale-Force Slash", "Aerial Ace Strike"],
-  Psychic: ["Psycho-Kinetic Crush", "Mind-Shatter Beam", "Telepathic Distortion", "Astral Blast"],
-  Bug: ["Swarm-Force Blitz", "Chitinous Impale", "Pheromone Blast", "Hive-Mind Strike"],
-  Rock: ["Meteorite Shatter", "Geo-Lock Crush", "Obsidian Spike Barrage", "Stone-Grave Slam"],
-  Ghost: ["Phantom Eclipse", "Spectral Soul-Drain", "Ethereal Terror", "Void Phase Strike"],
-  Dragon: ["Draconic Nebula Beam", "Dragon-Rage Outburst", "Wyrm-Tail Crush", "Celestial Roar"],
-  Dark: ["Abyssal Shadow-Claw", "Nightmare Pulse", "Dread-Blade Strike", "Oblivion Flash"],
-  Steel: ["Titanium Guillotine", "Iron-Core Cannon", "Steel-Tempest Slash", "Magneto-Slam"],
-  Fairy: ["Prismatic Star-Burst", "Pixie-Dust Tempest", "Fey-Charm Nova", "Ethereal Ray"]
+// Picks a move name for a creature's attack. Previously used invented,
+// anime-style move names (e.g. "Infernal Cataclysm") disconnected from the
+// actual Pokemon fighting - now pulls from that Pokemon's REAL learnset
+// (attached to creature.moves by creatures.js, STAB-preferred, capped at 6
+// per species). Falls back to a generic type-flavored name only in the
+// unlikely case a creature has no real moves attached (e.g. an older
+// creature object from before this fix, or a non-Pokemon test fixture).
+
+const FALLBACK_MOVES_BY_TYPE = {
+  Fire: "Fire Blast", Water: "Hydro Pump", Grass: "Solar Beam", Electric: "Thunderbolt",
+  Ice: "Ice Beam", Fighting: "Close Combat", Poison: "Sludge Bomb", Ground: "Earthquake",
+  Flying: "Hurricane", Psychic: "Psychic", Bug: "X-Scissor", Rock: "Rock Slide",
+  Ghost: "Shadow Ball", Dragon: "Dragon Pulse", Dark: "Dark Pulse", Steel: "Iron Head",
+  Fairy: "Moonblast", Normal: "Hyper Beam"
 };
 
 function pick(arr) {
@@ -24,12 +20,13 @@ function pick(arr) {
 }
 
 export function generateMove(creature) {
-  const typeKey = creature.primaryType.name;
-  const pool = MOVES_BY_TYPE[typeKey] || ["Elemental Power Strike", "Dynamic Impact", "Primal Blitz"];
-  
-  if (creature.hasMegaEvolved) {
-    return `APEX ${pick(pool).toUpperCase()}`;
+  if (creature.moves && creature.moves.length > 0) {
+    const move = pick(creature.moves);
+    // Mega Evolved creatures hit harder - reflect that in the callout
+    // without needing a fake "APEX" move name; the real move stays real.
+    return creature.hasMegaEvolved ? `${move.toUpperCase()}!` : move;
   }
-  
-  return pick(pool);
+
+  const typeKey = creature.primaryType?.name;
+  return FALLBACK_MOVES_BY_TYPE[typeKey] || "Tackle";
 }
