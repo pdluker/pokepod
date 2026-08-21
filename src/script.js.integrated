@@ -1,5 +1,4 @@
-import { moveVerbs, critLines, missLines, superEffectiveLines, resistedLines } from './battle.js';
-import { typeNamesOf, bestEffectiveness, bestAttackingType } from './type-effectiveness.js';
+import { moveVerbs, critLines, missLines } from './battle.js';
 import { generateTrainer, buildTrainerIntroLine } from './trainers.js';
 import { generateArena, buildArenaIntroLine } from './arenas.js';
 
@@ -77,17 +76,8 @@ function typeLine(creature) {
     : `${creature.primaryType.name} type`;
 }
 
-// Words whose SPOKEN form opens with a vowel sound despite a consonant
-// letter - "HP" is narrated "aitch-pee", so it takes "an". This matters
-// because these strings go to TTS, where the letter is irrelevant and only
-// the sound is heard. (Episode 29 shipped "That's a attack advantage";
-// without this the same fix would have produced "a HP advantage" instead.)
-const VOWEL_SOUND_INITIALS = /^(HP|MP|F|H|L|M|N|R|S|X)$/;
-
 function article(word) {
-  const w = String(word || '');
-  if (VOWEL_SOUND_INITIALS.test(w)) return 'an';
-  return /^[aeiou]/i.test(w) ? 'an' : 'a';
+  return /^[aeiou]/i.test(word) ? 'an' : 'a';
 }
 
 // creature.description (built once in creatures.js) embeds the raw
@@ -100,181 +90,101 @@ function speakableDescription(creature) {
 // --- Insight banks (unchanged in substance, just no longer handed off
 // between two hosts - these already read fine as solo analyst lines) ------
 
-// Reworded 2026-08-13. Every line here previously made a MECHANICAL claim
-// that battle.js does not implement - "punch above its weight the lower its
-// HP gets", "the speed stat on the sheet stops mattering", "can't be dropped
-// in one shot". battle.js's damage formula reads only hp/attack/defense/
-// speed; no ability is consulted anywhere in it. Episode 29 promised Blaze
-// would matter "in a long fight" and Tepig was knocked out by the first
-// landed attack.
-//
-// Rather than implement 28 abilities in the sim, these are now framed as
-// REPUTATION - what the ability is known for among trainers, which is true
-// of the real Pokemon and makes no promise about tonight's outcome. The
-// listener still learns something real; the narrator just stops forecasting
-// mechanics the fight can't deliver. (Type effectiveness is the one
-// exception worth actually wiring into battle.js - it's cheap, the audience
-// can verify it, and the typeChart already exists in this file.)
 const abilityInsights = {
-  Blaze: 'Blaze is the classic Fire-starter trait - the kind of reputation that makes opponents wary of letting things drag on.',
-  Torrent: 'Torrent is the water-flavored cousin of Blaze, and it carries the same reputation for late-fight comebacks.',
-  Overgrow: 'Overgrow has a slow-burn reputation among trainers - a name you hear in stories about long, grinding matches.',
-  Static: 'Static has a reputation for quiet disruption - nothing flashy, but aggressive opponents tend to respect it.',
-  Intimidate: "Intimidate is as much a reputation as an ability - opponents know the name before the match even starts.",
-  Levitate: "Levitate is famous for shrugging off an entire attack category - a reputation few competitors can claim.",
-  'Flash Fire': 'Flash Fire is known as a hard counter to fire-heavy opponents - the kind of name that changes how a card is scouted.',
-  'Water Absorb': 'Water Absorb has the same reputation on the water side - a real headache for a water-leaning opponent.',
-  'Volt Absorb': "Volt Absorb is known for turning electric attacks into an advantage - a reputation worth respecting.",
-  Pressure: "Pressure has a war-of-attrition reputation - a name associated with patient fighters, not flashy ones.",
-  'Thick Fat': 'Thick Fat is quietly one of the most respected defensive names in the game.',
-  Adaptability: 'Adaptability is known for making same-type offense hit harder than a stat sheet would suggest.',
-  'Swift Swim': "Swift Swim has a reputation for making speed numbers look misleading under the right conditions.",
-  Regenerator: 'Regenerator is known for sustain - the sort of ability other trainers openly envy.',
-  'Magic Guard': 'Magic Guard has a reputation for shrugging off everything that is not a direct hit.',
-  Multiscale: "Multiscale is known for making that opening hit less frightening than it looks.",
-  Sturdy: "Sturdy carries a reputation for refusing to go down easily - a name that shapes how opponents plan.",
-  'Iron Fist': 'Iron Fist is known for hitting harder than the base numbers suggest.',
-  'Sheer Force': 'Sheer Force has a high-ceiling reputation - trainers who run it tend to like living dangerously.',
-  'Prism Armor': "Prism Armor is known for blunting bad matchups - a rare and well-regarded name.",
-  Unaware: 'Unaware has a reputation for ignoring stat games entirely - opponents who like to boost find it frustrating.',
-  Moxie: 'Moxie is known for snowballing - a name that gets more attention the longer a fighter stays undefeated.',
-  'Sand Veil': 'Sand Veil is known for being a nightmare to pin down in the right terrain.',
-  'Snow Cloak': 'Snow Cloak has the same reputation as Sand Veil, just for the cold end of the map.',
-  'Poison Heal': 'Poison Heal is famous for turning something harmful into an advantage - a genuinely backwards-feeling name.',
-  'Rough Skin': 'Rough Skin has a reputation for punishing opponents who like to get close.',
-  'Tinted Lens': "Tinted Lens is known for flattening out matchups that ought to look one-sided.",
-  'Wonder Skin': 'Wonder Skin is known as a real answer to status-heavy opponents.'
+  Blaze: 'That ability lets it punch above its weight the lower its HP gets - dangerous in a long fight.',
+  Torrent: 'Same story as Blaze, just the water-flavored version - expect a late surge if this goes the distance.',
+  Overgrow: 'A slow-burn ability. If this fight drags on, watch for a second-wind moment.',
+  Static: 'Passive disruption - nothing flashy, but it quietly punishes aggressive opponents.',
+  Intimidate: "That's a mental-game ability as much as a stat one. Sets the tone before a single hit lands.",
+  Levitate: "Full immunity to an entire attack category. That's a free defensive floor most competitors don't get.",
+  'Flash Fire': 'A hard counter if the opponent leans on fire - turns a weakness into a buff outright.',
+  'Water Absorb': 'Same idea, different element. If the opposing kit is water-heavy, this is a real problem for them.',
+  'Volt Absorb': "Electric immunity plus a heal. That's not a small thing in a close fight.",
+  Pressure: "A war-of-attrition ability - this favors whoever's more patient, not whoever's flashier.",
+  'Thick Fat': 'Passive damage reduction against two whole categories. Quietly one of the best defensive abilities in the game.',
+  Adaptability: 'Every point of same-type offense hits harder than the stat sheet suggests.',
+  'Swift Swim': "Conditional, but when it's active, the speed stat on the sheet stops mattering.",
+  Regenerator: 'Free sustain most competitors would kill for - makes every exchange less costly than it looks.',
+  'Magic Guard': 'Zero incidental damage taken. Whatever happens here, it only takes damage from a direct hit.',
+  Multiscale: "Full health is doing real work right now - that first hit is going to matter less than you'd think.",
+  Sturdy: "Can't be dropped in one shot no matter the damage - that safety net changes how aggressively it can play.",
+  'Iron Fist': 'A quiet damage buff on top of everything else - punches harder than the base numbers suggest.',
+  'Sheer Force': 'Trades some consistency for raw power on the right move - high ceiling, real risk.',
+  'Prism Armor': "Reduces incoming supereffective damage - exactly the kind of ability that neutralizes a bad matchup.",
+  Unaware: 'Ignores stat changes entirely - any attempt to out-boost this one is dead on arrival.',
+  Moxie: 'Gets stronger with every knockout - the longer it stays alive, the scarier it gets.',
+  'Sand Veil': 'Conditional evasion - situational, but can make this a nightmare to pin down in the right arena.',
+  'Snow Cloak': 'Same idea as Sand Veil, just for the cold - arena conditions could matter a lot tonight.',
+  'Poison Heal': 'Turns a normally harmful status into free healing - a genuinely backwards-feeling ability that works.',
+  'Rough Skin': 'Punishes direct contact automatically - aggressive opponents pay a tax just for engaging.',
+  'Tinted Lens': "Weak-matchup moves stop being weak - flattens out what would otherwise be an obvious type disadvantage.",
+  'Wonder Skin': 'Makes status moves far less reliable against it - a real answer to a stall-heavy opponent.'
 };
 
-// The local typeChart that used to live here has been REPLACED by the
-// shared ./type-effectiveness.js module (2026-08-13). It was narration-only
-// while battle.js had no type term at all, which is what produced the
-// episode 24 Charmeleon/Escavalier contradiction. Its `weak` field also had
-// inverted semantics vs `strong` and was never read - see the note in the
-// new module. Both files now read the same data.
-
+const typeChart = {
+  Fire: { strong: ['Grass', 'Bug', 'Ice', 'Steel'], weak: ['Water', 'Rock', 'Ground'] },
+  Water: { strong: ['Fire', 'Rock', 'Ground'], weak: ['Grass', 'Electric'] },
+  Grass: { strong: ['Water', 'Rock', 'Ground'], weak: ['Fire', 'Ice', 'Bug', 'Flying'] },
+  Electric: { strong: ['Water', 'Flying'], weak: ['Ground'] },
+  Ice: { strong: ['Grass', 'Ground', 'Flying', 'Dragon'], weak: ['Fire', 'Fighting', 'Rock', 'Steel'] },
+  Fighting: { strong: ['Ice', 'Rock', 'Dark', 'Steel'], weak: ['Flying', 'Psychic', 'Fairy'] },
+  Poison: { strong: ['Grass', 'Fairy'], weak: ['Ground', 'Psychic'] },
+  Ground: { strong: ['Fire', 'Electric', 'Poison', 'Rock', 'Steel'], weak: ['Water', 'Grass', 'Ice'] },
+  Flying: { strong: ['Grass', 'Fighting', 'Bug'], weak: ['Electric', 'Ice', 'Rock'] },
+  Psychic: { strong: ['Fighting', 'Poison'], weak: ['Bug', 'Ghost', 'Dark'] },
+  Bug: { strong: ['Grass', 'Psychic', 'Dark'], weak: ['Fire', 'Flying', 'Rock'] },
+  Rock: { strong: ['Fire', 'Ice', 'Flying', 'Bug'], weak: ['Water', 'Grass', 'Fighting', 'Ground', 'Steel'] },
+  Ghost: { strong: ['Psychic', 'Ghost'], weak: ['Ghost', 'Dark'] },
+  Dragon: { strong: ['Dragon'], weak: ['Ice', 'Dragon', 'Fairy'] },
+  Dark: { strong: ['Psychic', 'Ghost'], weak: ['Fighting', 'Bug', 'Fairy'] },
+  Steel: { strong: ['Ice', 'Rock', 'Fairy'], weak: ['Fire', 'Fighting', 'Ground'] },
+  Fairy: { strong: ['Fighting', 'Dragon', 'Dark'], weak: ['Poison', 'Steel'] }
+};
 
 function typeMatchupNote(a, b) {
-  const aTypes = typeNamesOf(a);
-  const bTypes = typeNamesOf(b);
+  const aTypes = [a.primaryType.name, a.secondaryType?.name].filter(Boolean);
+  const bTypes = [b.primaryType.name, b.secondaryType?.name].filter(Boolean);
 
-  // Now reads the SAME multiplier battle.js applies to damage, rather than a
-  // parallel chart. Whatever this line predicts, the fight will honor.
-  const aMult = bestEffectiveness(aTypes, bTypes);
-  const bMult = bestEffectiveness(bTypes, aTypes);
-
-  // Report whichever side has the larger genuine edge, so a mutual-advantage
-  // matchup doesn't silently favor whoever happens to be creature A.
-  if (aMult > 1 && aMult >= bMult) {
-    const at = bestAttackingType(aTypes, bTypes);
-    const emphasis = aMult >= 4 ? 'a massive' : 'a real';
-    return `On paper that is ${emphasis} type advantage for ${speakable(a.name)} - ${at} hits this matchup hard, and if it presses that early this could get lopsided fast.`;
+  for (const at of aTypes) {
+    const chart = typeChart[at];
+    if (!chart) continue;
+    for (const bt of bTypes) {
+      if (chart.strong.includes(bt)) {
+        return `On paper, ${at} has the edge over ${bt} here - if ${speakable(a.name)} presses that advantage early, this could get lopsided fast.`;
+      }
+    }
   }
-  if (bMult > 1) {
-    const bt = bestAttackingType(bTypes, aTypes);
-    const emphasis = bMult >= 4 ? 'a massive' : 'a real';
-    return `Type-wise ${speakable(b.name)} has ${emphasis} edge here - ${bt} is a bad matchup for the other side of this card.`;
-  }
-  if (aMult < 1 && bMult < 1) {
-    return `Both of these are swinging into unfavorable typing tonight - expect a grind rather than a quick finish.`;
+  for (const bt of bTypes) {
+    const chart = typeChart[bt];
+    if (!chart) continue;
+    for (const at of aTypes) {
+      if (chart.strong.includes(at)) {
+        return `Type-wise, ${bt} actually has the favorable matchup here against ${at} - don't sleep on ${speakable(b.name)} early.`;
+      }
+    }
   }
   return `No clean type advantage either direction here - this one likely comes down to the raw stat sheet, not the matchup chart.`;
 }
 
-// --- Blowout handling (added 2026-08-13) -----------------------------------
-//
-// Episode 29 (Tepig 308 BST vs Urshifu 550 BST) ended in a single hit: 113
-// damage into 65 HP. The narration still called it "a card that does not
-// disappoint", "What a battle", and "a genuinely well-fought match on both
-// sides" - because every phrase bank in this file was written assuming a
-// competitive fight, and nothing here knew otherwise. These banks give the
-// narrator honest language for a squash, which is a better listen than
-// false suspense: kids notice when the commentary disagrees with what just
-// happened.
-//
-// A fight is a blowout if it ended fast AND the loser never meaningfully
-// threatened - both conditions, so a genuine back-and-forth that happens to
-// end quickly doesn't get downgraded.
-function isBlowout(log, winnerCreature, loserCreature) {
-  if (!Array.isArray(log) || !log.length) return false;
-  const landed = log.filter(e => e.type !== 'miss');
-  if (landed.length > 3) return false;
-
-  // Did the loser ever land damage on the winner?
-  const damageToWinner = landed
-    .filter(e => e.attacker === loserCreature.name)
-    .reduce((sum, e) => sum + (e.damage || 0), 0);
-  const winnerHp = winnerCreature.stats.hp || 1;
-  return (damageToWinner / winnerHp) < 0.25;
-}
-
-const blowoutVictoryColorNotes = [
-  (winner, loser) => `There is no other way to describe that: ${winner} was simply operating at a different level tonight.`,
-  (winner, loser) => `That was over before it started. ${winner} did not give ${loser} a single opening to work with.`,
-  (winner, loser) => `One-sided from the opening bell - ${winner} ended it at the first real opportunity.`,
-  (winner, loser) => `${winner} needed one clean look and took it. ${loser} never got to show what it came in with.`
-];
-
-const blowoutAsides = [
-  () => `Short night in the arena, but a decisive one.`,
-  () => `Not every card goes the distance - some are settled in a single exchange.`,
-  () => `A mismatch on paper, and it played out that way.`,
-  () => `Quick work tonight. We will see a closer one soon enough.`
-];
-
-const blowoutSignoffRecaps = [
-  (winner) => `${winner} came in with the advantage and never let the question get asked.`,
-  (winner) => `Nothing complicated about it - ${winner} was the stronger fighter and proved it immediately.`,
-  (winner) => `${winner} did exactly what the numbers said it would do.`
-];
-
 const statInsightPhrases = [
   (winner, statName) => `${winner} simply outclassed the field in ${statName} tonight, and it showed.`,
   (winner, statName) => `Break down the numbers and ${winner}'s ${statName} was the real difference-maker.`,
-  (winner, statName) => `That's ${article(statName)} ${statName} advantage translating directly into a result - nothing lucky about it.`
+  (winner, statName) => `That's a ${statName} advantage translating directly into a result - nothing lucky about it.`
 ];
 
-// A stat lead only gets credit for the result if it is actually large enough
-// to have plausibly mattered. Previously this took the single largest raw
-// diff regardless of size, which produced episode 26's claim that Porygon2
-// "outclassed the field in HP" off an 85-vs-80 edge - while ignoring that it
-// was OUT-statted 80-vs-120 on attack and lost the speed tempo. Two guards
-// now: an absolute floor and a relative floor, both of which must clear.
-const MIN_STAT_GAP = 15;      // raw points
-const MIN_STAT_GAP_PCT = 0.18; // relative to the loser's value
-
-// If the fight actually turned on whiffed attacks rather than the stat sheet,
-// say so - crediting a stat lead in a miss-decided fight is the same class of
-// wrong answer as crediting a 5-point HP edge.
-function missDecided(log) {
-  if (!Array.isArray(log) || !log.length) return false;
-  const misses = log.filter(e => e.type === 'miss').length;
-  return misses >= 2 && misses / log.length >= 0.4;
-}
-
-function decisiveStatNote(winnerCreature, loserCreature, exclude, log) {
-  const winnerSpeakable = speakable(winnerCreature.name);
-
-  if (missDecided(log)) {
-    return { text: `The stat sheet did not decide this one - ${winnerSpeakable} stayed composed while the attacks that mattered sailed wide.`, index: null };
-  }
-
+function decisiveStatNote(winnerCreature, loserCreature, exclude) {
   const stats = ['hp', 'attack', 'defense', 'speed'];
   const statLabels = { hp: 'HP', attack: 'attack', defense: 'defense', speed: 'speed' };
   let biggestGap = null;
   for (const s of stats) {
     const gap = winnerCreature.stats[s] - loserCreature.stats[s];
-    const pct = loserCreature.stats[s] > 0 ? gap / loserCreature.stats[s] : 0;
-    if (gap < MIN_STAT_GAP || pct < MIN_STAT_GAP_PCT) continue;
     if (!biggestGap || gap > biggestGap.gap) biggestGap = { stat: s, gap };
   }
-
-  if (!biggestGap) {
-    return { text: `Statistically this was close to even - ${winnerSpeakable} won this one on execution, not raw numbers.`, index: null };
+  if (biggestGap.gap <= 0) {
+    return { text: `Statistically this was close to even - ${speakable(winnerCreature.name)} won this one on execution, not raw numbers.`, index: null };
   }
-
   const { item, index } = pickIndexed(statInsightPhrases, exclude);
-  return { text: item(winnerSpeakable, statLabels[biggestGap.stat]), index };
+  return { text: item(speakable(winnerCreature.name), statLabels[biggestGap.stat]), index };
 }
 
 // --- NEW: Environment-aware commentary builder (Tier 3A) ---
@@ -373,27 +283,10 @@ const victoryColorNotes = [
   (winner) => `You don't get a finish like that without discipline. ${winner} earned every bit of it.`
 ];
 
-// Verbs for MISSED attacks. moveVerbs (from battle.js) all assert a landed
-// hit ("connects a brutal hit on", "unleashes a devastating strike on"), so
-// composing them with a missLine produced self-contradicting narration:
-// "Mabosstiff connects a brutal hit on Porygon Two, but it whiffs completely!"
-// (observed live, episode 26). These describe the ATTEMPT only, so the
-// missLine that follows resolves it.
-const attemptVerbs = [
-  'lunges at',
-  'comes charging in at',
-  'swings on',
-  'goes after',
-  'winds up on',
-  'closes the distance on',
-  'takes a shot at',
-  'drives forward at'
-];
-
 const signoffAsides = [
   () => `Congratulations to the winner and their trainer on a hard-fought result.`,
   () => `Another good one in the books. Same time tomorrow.`,
-  () => `Solid card tonight - both of them left it all in that arena.`,
+  () => `Solid card tonight - nobody in that arena left anything unanswered.`,
   () => `That's the kind of result that's going to be talked about in the arena for a few days.`,
   () => `A genuinely well-fought match on both sides tonight.`,
   () => `That's tonight's story, and it's a good one.`
@@ -448,26 +341,22 @@ function introBeats(showName, episodeNumber, dateStr, a, b, trainerA, trainerB, 
   beats.push({ speaker: 'narrator', text: coldOpen.item(showName, episodeNumber, dateStr) });
 
   // NEW (Tier 3A): Add condition intro line if conditions exist
-  // buildConditionIntroLine returns null on a quiet day (see the note in
-  // arena-conditions.js) - skip the beat entirely rather than narrating
-  // filler. The old guard tested conditions.earth, which is ALWAYS truthy
-  // because QUIET_DAY is its floor value, so this beat fired every episode.
-  if (conditions) {
+  if (conditions && (conditions.earth || conditions.space)) {
     const conditionIntro = buildConditionIntroLine(conditions);
-    if (conditionIntro) beats.push({ speaker: 'narrator', text: conditionIntro });
+    beats.push({ speaker: 'narrator', text: conditionIntro });
   }
 
   // Creature A: reveal + type/ability/description/insight folded into one
   // flowing profile paragraph instead of a reveal-then-handoff exchange.
   beats.push({ speaker: 'narrator', text:
-    `In the first corner tonight: standing ${a.height} feet tall and weighing ${a.weight} pounds, ${speakable(a.name)} - ${article(a.primaryType.name)} ${typeLine(a)} running ${a.ability}. ${speakableDescription(a)} ${abilityInsights[a.ability] || 'Not an ability you hear about every night, but it has its admirers.'}` });
+    `In the first corner tonight: standing ${a.height} feet tall and weighing ${a.weight} pounds, ${speakable(a.name)} - ${article(a.primaryType.name)} ${typeLine(a)} running ${a.ability}. ${speakableDescription(a)} ${abilityInsights[a.ability] || 'Worth watching how that ability shapes the pacing of this fight.'}` });
 
   beats.push({ speaker: 'narrator', text:
-    `Backing ${speakable(a.name)} tonight is trainer ${trainerA.name}, who ${trainerA.background}. Fighting out of ${trainerA.hometown}, ${trainerA.name} ${trainerA.quirk}.` });
+    `Backing ${speakable(a.name)} tonight is trainer ${trainerA.name}, who ${trainerA.background}. Out of ${trainerA.hometown}, and ${trainerA.quirk}.` });
 
   // Creature B
   beats.push({ speaker: 'narrator', text:
-    `Across the arena: standing ${b.height} feet tall and weighing ${b.weight} pounds, ${speakable(b.name)} - ${article(b.primaryType.name)} ${typeLine(b)}, carrying ${b.ability}. ${speakableDescription(b)} ${abilityInsights[b.ability] || "A less common name, and one this trainer clearly has a reason for running."}` });
+    `Across the arena: standing ${b.height} feet tall and weighing ${b.weight} pounds, ${speakable(b.name)} - ${typeLine(b)}, carrying ${b.ability}. ${speakableDescription(b)} ${abilityInsights[b.ability] || "That's going to be a factor as this fight develops."}` });
 
   beats.push({ speaker: 'narrator', text:
     `And guiding ${speakable(b.name)} is trainer ${trainerB.name}, who comes to us from ${trainerB.hometown}, and ${trainerB.quirk}.` });
@@ -510,24 +399,16 @@ function battleBeats(battleResult, a, b, exclude, used) {
   highlights.forEach(event => {
     if (event.type === 'miss') {
       beats.push({ speaker: 'narrator', text:
-        `${speak(event.attacker)} ${pick(attemptVerbs)} ${speak(event.defender)}, ${pick(missLines)}` });
+        `${speak(event.attacker)} ${pick(moveVerbs)} ${speak(event.defender)}, ${pick(missLines)}` });
       return;
     }
 
-    // Type effectiveness is now a real damage term (see battle.js), so the
-    // narration reflects it - a 4x hit that sounds identical to a neutral
-    // one wastes the mechanic entirely. Reads straight off the log's own
-    // effectiveness field, so commentary and math cannot disagree.
-    let effectSuffix = '';
-    if (event.effectiveness >= 2) effectSuffix = ` - ${pick(superEffectiveLines)}`;
-    else if (event.effectiveness <= 0.5) effectSuffix = ` - ${pick(resistedLines)}`;
-
     if (event.type === 'crit') {
       beats.push({ speaker: 'narrator', text:
-        `Then came the moment that swung this fight: ${speak(event.attacker)} ${pick(moveVerbs)} ${speak(event.defender)}. ${pick(critLines)} a massive ${event.damage} damage, dropping ${speak(event.defender)} to ${event.defenderHpRemaining} out of ${event.defenderMaxHp} HP${effectSuffix}. That's the kind of hit that isn't random noise - it's exactly the kind of variance that separates a close matchup from a rout.` });
+        `Then came the moment that swung this fight: ${speak(event.attacker)} ${pick(moveVerbs)} ${speak(event.defender)}. ${pick(critLines)} a massive ${event.damage} damage, dropping ${speak(event.defender)} to ${event.defenderHpRemaining} out of ${event.defenderMaxHp} HP. That's the kind of hit that isn't random noise - it's exactly the kind of variance that separates a close matchup from a rout.` });
     } else {
       beats.push({ speaker: 'narrator', text:
-        `${speak(event.attacker)} ${pick(moveVerbs)} ${speak(event.defender)} for ${event.damage} damage${effectSuffix}, leaving them at ${event.defenderHpRemaining} out of ${event.defenderMaxHp} HP.` });
+        `${speak(event.attacker)} ${pick(moveVerbs)} ${speak(event.defender)} for ${event.damage} damage, leaving them at ${event.defenderHpRemaining} out of ${event.defenderMaxHp} HP.` });
     }
 
     const hpPct = event.defenderHpRemaining / event.defenderMaxHp;
@@ -542,33 +423,19 @@ function battleBeats(battleResult, a, b, exclude, used) {
     const winnerSpeakable = speakable(winner);
     const loserSpeakable = speakable(loser);
 
-    const winnerCreature = winner === a.name ? a : b;
-    const loserCreature = winner === a.name ? b : a;
-    const blowout = isBlowout(log, winnerCreature, loserCreature);
-
     const victoryLine = pickIndexed(victoryLines, exclude.victoryLines);
     used.victoryLines = victoryLine.index;
 
-    // On a blowout, swap the color note for one that matches what actually
-    // happened. The blowout banks are NOT index-tracked against
-    // exclude.victoryColorNotes - they're a separate, smaller pool, and
-    // reusing that exclude key across two different-length banks would let a
-    // stale index point out of range. Blowouts are infrequent enough that
-    // unfiltered repetition is acceptable; the contract shape is unchanged.
-    let colorNoteText;
-    if (blowout) {
-      colorNoteText = pick(blowoutVictoryColorNotes)(winnerSpeakable, loserSpeakable);
-    } else {
-      const victoryColorNote = pickIndexed(victoryColorNotes, exclude.victoryColorNotes);
-      used.victoryColorNotes = victoryColorNote.index;
-      colorNoteText = victoryColorNote.item(winnerSpeakable);
-    }
+    const victoryColorNote = pickIndexed(victoryColorNotes, exclude.victoryColorNotes);
+    used.victoryColorNotes = victoryColorNote.index;
 
-    const statNote = decisiveStatNote(winnerCreature, loserCreature, exclude.statInsightPhrases, log);
+    const winnerCreature = winner === a.name ? a : b;
+    const loserCreature = winner === a.name ? b : a;
+    const statNote = decisiveStatNote(winnerCreature, loserCreature, exclude.statInsightPhrases);
     used.statInsightPhrases = statNote.index;
 
     beats.push({ speaker: 'narrator', text: victoryLine.item(winnerSpeakable, loserSpeakable) });
-    beats.push({ speaker: 'narrator', text: `${colorNoteText} ${statNote.text}` });
+    beats.push({ speaker: 'narrator', text: `${victoryColorNote.item(winnerSpeakable)} ${statNote.text}` });
   } else {
     beats.push({ speaker: 'narrator', text:
       `Unbelievable - both competitors go down in the same exchange. A genuine double knockout, and statistically these two were about as evenly matched as it gets tonight. The result backs that up.` });
@@ -577,16 +444,11 @@ function battleBeats(battleResult, a, b, exclude, used) {
   return beats;
 }
 
-function signoffBeats(showName, winner, exclude, used, conditions, winnerCreature, loserCreature, blowout) {
+function signoffBeats(showName, winner, exclude, used, conditions, winnerCreature, loserCreature) {
   const winnerSpeakable = winner ? speakable(winner) : null;
 
-  // On a blowout, both the recap ("What a battle") and the aside ("a
-  // genuinely well-fought match on both sides") actively contradict what
-  // the listener just heard - see the isBlowout note above.
-  const aside = blowout
-    ? { item: pick(blowoutAsides), index: null }
-    : pickIndexed(signoffAsides, exclude.signoffAsides);
-  if (!blowout) used.signoffAsides = aside.index;
+  const aside = pickIndexed(signoffAsides, exclude.signoffAsides);
+  used.signoffAsides = aside.index;
 
   const final = pickIndexed(finalSignoffs, exclude.finalSignoffs);
   used.finalSignoffs = final.index;
@@ -603,17 +465,8 @@ function signoffBeats(showName, winner, exclude, used, conditions, winnerCreatur
     );
   }
 
-  let recap;
-  if (!winner) {
-    recap = `What a battle. A wild one to end on today.`;
-  } else if (blowout) {
-    recap = `${pick(blowoutSignoffRecaps)(winnerSpeakable)}${environmentalCommentary}`;
-  } else {
-    recap = `What a battle. ${winnerSpeakable} fought smart, fought hard, and tonight fought to win.${environmentalCommentary}`;
-  }
-
   return [
-    { speaker: 'narrator', text: `${recap} ${aside.item()}` },
+    { speaker: 'narrator', text: `What a battle. ${winner ? `${winnerSpeakable} fought smart, ${winnerSpeakable} fought hard, and tonight ${winnerSpeakable} fought to win.${environmentalCommentary}` : 'A wild one to end on today.'} ${aside.item()}` },
     { speaker: 'narrator', text: final.item(showName) }
   ];
 }
@@ -641,17 +494,10 @@ export function buildEpisodeScript({ showName, episodeNumber, dateStr, creatureA
   const winnerCreature = battleResult.winner === creatureA.name ? creatureA : (battleResult.winner === creatureB.name ? creatureB : null);
   const loserCreature = battleResult.loser === creatureA.name ? creatureA : (battleResult.loser === creatureB.name ? creatureB : null);
 
-  // Computed once here so battleBeats and signoffBeats agree on it - a
-  // fight narrated as a squash in the recap must not be called "a genuinely
-  // well-fought match on both sides" two beats later.
-  const blowout = (winnerCreature && loserCreature)
-    ? isBlowout(battleResult.log, winnerCreature, loserCreature)
-    : false;
-
   const beats = [
     ...introBeats(showName, episodeNumber, dateStr, creatureA, creatureB, trainerA, trainerB, arena, exclude, used, conditions),
     ...battleBeats(battleResult, creatureA, creatureB, exclude, used),
-    ...signoffBeats(showName, battleResult.winner, exclude, used, conditions, winnerCreature, loserCreature, blowout)
+    ...signoffBeats(showName, battleResult.winner, exclude, used, conditions, winnerCreature, loserCreature)
   ];
 
   const taglinePool = battleResult.winner ? fightHypeTaglines : doubleKOTaglines;

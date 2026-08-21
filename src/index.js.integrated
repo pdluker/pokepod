@@ -1,5 +1,5 @@
 import { requireAuth } from './auth.js';
-import { generateMatchedPair } from './creatures.js';
+import { generateCreature } from './creatures.js';
 import { simulateBattle } from './battle.js';
 import { generateTrainer } from './trainers.js';
 import { generateArena } from './arenas.js';
@@ -8,6 +8,11 @@ import { synthesizeEpisode } from './tts.js';
 import { generatePoster } from './poster.js';
 import { buildRssFeed } from './rss.js';
 import { PLAYER_HTML } from './player.js';
+
+// NEW: Import landscape condition integration (Tiers 1-2)
+import { assessConditions, getArenaWeights, selectArenaWeighted, generateArenaVariant } from './arena-conditions.js';
+import { ARENAS } from './arenas.js';
+
 const EPISODES_KEY = 'episodes.json';
 const FEED_KEY = 'feed.xml';
 const STATUS_KEY = 'last-run-status.json';
@@ -82,12 +87,11 @@ function pushWindow(arr, value, windowSize) {
 async function runRefresh(env) {
   const recentFlavor = await readJsonFromR2(env.PODCAST_BUCKET, RECENT_FLAVOR_KEY, {});
 
-  // Build exclude sets for creature A straight from history. generateMatchedPair
-  // draws A freely, then picks B from a similar base-stat-total band and
-  // excludes A itself - so the same-episode mirror guard the old two-call
-  // version did inline is now handled inside creatures.js.
+  // Build exclude sets for creature A straight from history.
   const recentNames = new Set(recentFlavor.recentCreatureNames || []);
-  const [creatureA, creatureB] = generateMatchedPair(recentNames);
+  const creatureA = generateCreature(recentNames);
+  const creatureB = generateCreature(new Set([...recentNames, creatureA.name]));
+
   const battleResult = simulateBattle(creatureA, creatureB);
 
   const episodes = await readJsonFromR2(env.PODCAST_BUCKET, EPISODES_KEY, []);
@@ -117,26 +121,45 @@ async function runRefresh(env) {
     doubleKOTaglines: new Set(recentFlavor.doubleKOTaglines || []),
     arenaNames: toSet(recentFlavor.arenaNames),
     trainerA: trainerExcludeA
-    // trainerB's exclude set is built after trainerA is generated inside
-    // buildEpisodeScript itself isn't possible without restructuring further,
-    // so trainerB here reuses the same history-based set as trainerA - same-
-    // episode cross-exclusion between the two trainers is a smaller miss
-    // than the creature one and left as a follow-up rather than blocking
-    // this pass on it.
   };
   scriptExclude.trainerB = trainerExcludeA;
+
+  // ===== NEW (Tier 1 & 2): Assess conditions and select weighted arena =====
+  let conditions = { earth: null, space: null, earthData: null, spaceData: null };
+  try {
+    conditions = await assessConditions(env);
+  } catch (err) {
+    console.warn('Failed to assess conditions; using defaults:', err);
+  }
+
+  // Tier 1: Get weights based on conditions
+  const weights = getArenaWeights(conditions);
+
+  // Tier 2: Select arena with weighted randomness, then generate variant
+  const baseArena = selectArenaWeighted(ARENAS, weights, scriptExclude.arenaNames);
+  const arena = generateArenaVariant(baseArena, conditions);
+  
+  // Skip the old generateArena() call; we already have our arena
+  // (buildEpisodeScript will receive it and skip its own generateArena call)
+  // =======================================================================
 
   // trainerA/trainerB/arena are generated inside buildEpisodeScript - the
   // objects it returns are what actually got used, needed both for the
   // episode content and to record into history below.
-  const { title, beats, trainerA, trainerB, arena, usedIndices } = buildEpisodeScript({
+  // 
+  // CHANGED: Pass the pre-generated arena and conditions to buildEpisodeScript
+  // so script.js can use them for environmental narration (Tier 3A)
+  const { title, beats, trainerA, trainerB, usedIndices } = buildEpisodeScript({
     showName: env.SHOW_NAME || 'Daily Creature Clash',
     episodeNumber,
     dateStr,
     creatureA,
     creatureB,
     battleResult,
-    exclude: scriptExclude
+    exclude: scriptExclude,
+    // NEW: Pass pre-generated arena and conditions
+    preGeneratedArena: arena,
+    conditions
   });
 
   const [audioOutcome, posterOutcome] = await Promise.allSettled([
@@ -184,7 +207,6 @@ async function runRefresh(env) {
   const speakerLabel = { narrator: 'Doc' };
   const description = beats
     .map((beat) => `<b>${speakerLabel[beat.speaker] || beat.speaker}:</b> ${beat.text}`)
-
     .join('<br/><br/>');
 
   const episodeMeta = {
@@ -244,22 +266,13 @@ async function runRefresh(env) {
     doubleKOTaglines: usedIndices.doubleKOTaglines != null
       ? pushWindow(recentFlavor.doubleKOTaglines, usedIndices.doubleKOTaglines, WINDOWS.doubleKOTaglines)
       : (recentFlavor.doubleKOTaglines || []),
-    // Both fighters are recorded, not just A. Previously only creatureA
-    // landed in the exclusion window, so creatureB could reappear as the
-    // very next episode's opponent. That was a latent repeat source before
-    // and matters more now: generateMatchedPair draws B from a narrow
-    // base-stat band around A, so a re-drawn A pulls from the same small
-    // neighbourhood and makes an immediate B repeat likelier still.
-    recentCreatureNames: pushWindow(
-      pushWindow(recentFlavor.recentCreatureNames, creatureA.name, 20),
-      creatureB.name,
-      20
-    )
+    recentCreatureNames: pushWindow(recentFlavor.recentCreatureNames, creatureA.name, 20)
   };
   await env.PODCAST_BUCKET.put(RECENT_FLAVOR_KEY, JSON.stringify(nextFlavor, null, 2), {
     httpMetadata: { contentType: 'application/json', cacheControl: 'no-cache' }
   });
-const feedUrl = `${env.R2_PUBLIC_BASE_URL}/${FEED_KEY}`;
+
+  const feedUrl = `${env.R2_PUBLIC_BASE_URL}/${FEED_KEY}`;
   const showMeta = {
     title: env.SHOW_NAME || 'Daily Creature Clash',
     description: 'A daily randomized creature battle, with full commentary - new episode every day.',

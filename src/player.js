@@ -102,12 +102,16 @@ export const PLAYER_HTML = `<!DOCTYPE html>
   .arena .legend { font-style: italic; opacity: 0.8; }
 
   .archive-item {
-    display: flex; gap: 12px; align-items: center;
-    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
   }
   .archive-item img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .archive-item > div { flex: 1; min-width: 0; }
   .archive-item .archive-title { font-size: 0.85rem; margin: 0 0 2px; }
-  .archive-item .archive-meta { font-size: 0.72rem; opacity: 0.65; }
+  .archive-item .archive-meta { font-size: 0.72rem; opacity: 0.65; margin-bottom: 6px; }
+  .archive-item audio { width: 100%; margin: 6px 0; }
+  .archive-item .toggle-btn { padding: 6px 14px; font-size: 0.78rem; margin-top: 4px; }
+  .archive-item .transcript { font-size: 0.82rem; }
 
   .loading, .empty { text-align: center; opacity: 0.7; padding: 40px 0; }
 </style>
@@ -327,10 +331,27 @@ export const PLAYER_HTML = `<!DOCTYPE html>
             <div>
               <div class="archive-title">\${escapeHtml(main)}</div>
               <div class="archive-meta">Episode \${ep.episodeNumber} · \${date}</div>
+              \${ep.audioUrl ? \`<audio controls preload="none" src="\${ep.audioUrl}"></audio>\` : ''}
+              <div>
+                <button class="toggle-btn archive-toggle-btn" data-episode="\${ep.episodeNumber}">Show full transcript</button>
+                <div class="transcript" id="archive-transcript-\${ep.episodeNumber}">\${ep.description}</div>
+              </div>
             </div>
           </div>\`;
       }).join('');
       container.innerHTML = \`<div class="card"><h3 style="margin:0 0 4px;font-size:1rem;">Past Episodes</h3>\${html}</div>\`;
+
+      // Event delegation: one listener on the container handles every archived
+      // episode's toggle button, so this keeps working as more episodes get
+      // added without rebinding anything per-item.
+      container.addEventListener('click', (e) => {
+        const btn = e.target.closest('.archive-toggle-btn');
+        if (!btn) return;
+        const body = document.getElementById(\`archive-transcript-\${btn.dataset.episode}\`);
+        if (!body) return;
+        body.classList.toggle('open');
+        btn.textContent = body.classList.contains('open') ? 'Hide full transcript' : 'Show full transcript';
+      });
     }
 
     document.getElementById('feedUrl').textContent = R2_BASE + '/feed.xml';

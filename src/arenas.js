@@ -1,16 +1,21 @@
 // arenas.js
 // Generates a randomized battle arena to set the stage before the fight.
-// Pure flavor/setting data — no gameplay effect required, though hazard
+// Pure flavor/setting data - no gameplay effect required, though hazard
 // and weather fields are included so battle.js / script.js can optionally
 // react to them later (e.g. fire moves stronger in the Scorched Caldera).
 //
 // Expanded 2026-07-30: arena count more than doubled (10 -> 24), and every
-// entry now includes a "legend" field — a short bit of local history/lore
+// entry now includes a "legend" field - a short bit of local history/lore
 // about the venue itself, independent of the creatures fighting in it.
 // generateArena() and buildArenaIntroLine()'s signatures are unchanged;
 // legend is available on every returned arena object as a pure addition.
 
-const ARENAS = [
+// Exported 2026-08-12: arena-conditions.js's weighted selection
+// (selectArenaWeighted) needs the raw pool, and its own usage docs already
+// call for `import { ARENAS } from './arenas.js'` - but this was only ever
+// a module-local const, so that import would have resolved to undefined and
+// thrown inside selectArenaWeighted's .filter() on the first Tier 1 run.
+export const ARENAS = [
   {
     name: "Scorched Caldera",
     description: "a cracked volcanic basin ringed by slow rivers of lava",
@@ -57,7 +62,7 @@ const ARENAS = [
     name: "Skyreach Platform",
     description: "a floating stone platform suspended high above the clouds",
     weather: "thin, cold air",
-    hazard: "a fall here is no joke — footwork matters",
+    hazard: "a fall here is no joke, so footwork matters",
     legend: "engineers still cannot fully explain what keeps the platform aloft"
   },
   {
@@ -162,7 +167,7 @@ const ARENAS = [
     name: "Sunken Bell Ruins",
     description: "the remains of a submerged bell tower, its peak still breaking the waterline",
     weather: "humid and still",
-    hazard: "the old bell reportedly still tolls faintly when struck by a powerful enough hit",
+    hazard: "submerged stonework shifts without warning underfoot",
     legend: "no one has definitively explained how the bell still rings after all this time"
   },
   {
@@ -193,7 +198,28 @@ export function generateArena(exclude) {
 
 // Optional: a short spoken intro line built from the arena, ready to drop
 // straight into script.js's opening beat.
+// Fixed 2026-08-12 (three separate bugs found in live episode 26 narration):
+//
+// 1. "at the ${arena.name}" prepended an article to proper nouns that don't
+//    take one ("at the Driftglass Bay"). Article dropped entirely - correct
+//    for all 24 names, whereas "the" is only correct for a handful.
+// 2. Em dash violated this account's standing plain-ASCII rule (PowerShell
+//    5.1 encoding corruption, earth.stluker.com Jul 23). Now a hyphen.
+// 3. "with ${arena.weather} setting the mood" assumed every weather value
+//    was a noun phrase. 8 of 24 are adjective phrases ("eerily calm",
+//    "still and shaded"), and Driftglass Bay's own value already begins
+//    with "with" - producing "with calm with a persistent low tide setting
+//    the mood". Weather is now its own clause, which reads correctly for
+//    both shapes AND for the appended variants arena-conditions.js
+//    generates (e.g. "clear and still, with visible smoke on the horizon").
+// 4. "Watch your footing: ${arena.hazard}" assumed every hazard was a
+//    terrain hazard. Only 8 of 24 are - the rest are visibility (ash-fall,
+//    fog), acoustics (echo, ricochet), attack interference (metallic roots,
+//    crosswinds) or pure atmosphere (the silence at Quietfall Gardens). It
+//    also stuttered on the three entries that already say "footing"
+//    themselves ("Watch your footing: slick ice makes footing treacherous").
+//    The lead-in is now category-neutral, which reads correctly for all 24.
 export function buildArenaIntroLine(arena) {
-  return `Today's battle unfolds at the ${arena.name} — ${arena.description}, ` +
-    `with ${arena.weather} setting the mood. Watch your footing out there: ${arena.hazard}.`;
+  return `Today's battle unfolds at ${arena.name} - ${arena.description}. ` +
+    `Conditions out there: ${arena.weather}. One thing to keep an eye on: ${arena.hazard}.`;
 }
