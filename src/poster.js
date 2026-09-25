@@ -21,26 +21,45 @@
 //   today, so any bolder title treatment should be a frontend/CSS change,
 //   not a prompt change.
 //
+// - Aug 22, 2026: art direction changed again, from flat-vector
+//   tech-editorial to Japanese anime style, per explicit reference.
+//   First pass leaned into a Gundam mecha reframing (creatures rendered as
+//   armored mobile suits) - feedback was that this went too far from the
+//   show's actual subject matter (real creatures, Pokemon-adjacent) and
+//   away from "anime" as a rendering style. Reverted the mecha framing;
+//   creatures.js's organic, type-based visualDescription is now used
+//   directly again, just rendered in a Japanese anime illustration style
+//   (cel-shading, bold linework, vibrant color) rather than as mechs.
+//
 // Fixed Aug 2026: this file was still building each creature's visual
 // description from `creature.visualDescription` - a field that only
 // existed on the old fictional-creature schema. The Aug 7 creatures.js
 // rebuild (real Pokemon via @pkmn/dex) never had that field, so every
 // poster since has been prompted with a literal "undefined" for what each
-// creature actually looks like - the model had type-color and arena
-// context but zero idea which creature it was drawing. Replaced with the
-// real schema's name/category/type fields, which is exactly what
-// script.js's own commentary is already built from (see script.js's use
-// of primaryType/secondaryType/category), so the poster and the narration
-// are now describing the same creature from the same data.
+// creature actually looks like. At the time, this was fixed by switching
+// to the real schema's name/category/type fields directly.
+//
+// CHANGED 2026-08-22: creatures.js has since re-added a real
+// `visualDescription` field (see creatures.js's own header note: "for
+// poster.js's image-generation prompt - generic, type-based, no species
+// name/likeness"), built from a proper per-type texture/color/build table
+// (TYPE_VISUAL_STYLE). This file no longer re-derives its own thinner
+// description from primaryType/category - it reads creatures.js's field
+// directly, which is both richer and keeps the two files from
+// independently drifting on what "trademark-safe" means. This also
+// reverses a regression: the name/category-based version introduced here
+// had drifted into asking the model to render "the real Pokemon {name}...
+// recognizably as its actual species design" - the exact copyrighted-
+// likeness problem this field exists to avoid.
 
 // Loud failure instead of a silent "undefined" poster if creatures.js's
 // schema drifts again - this exact class of bug (a field poster.js/
 // script.js/index.js depends on quietly disappearing from creatures.js)
 // has already happened twice in this project.
 function assertCreatureShape(creature, label) {
-  if (!creature || !creature.name || !creature.primaryType || !creature.primaryType.color || !creature.primaryType.name) {
+  if (!creature || !creature.name || !creature.primaryType || !creature.primaryType.color || !creature.primaryType.name || !creature.visualDescription) {
     throw new Error(
-      `poster.js: ${label} is missing expected fields (name / primaryType.name / primaryType.color) - ` +
+      `poster.js: ${label} is missing expected fields (name / primaryType.name / primaryType.color / visualDescription) - ` +
       `creatures.js's schema may have changed again. Got keys: ${creature ? Object.keys(creature).join(', ') : 'null'}`
     );
   }
@@ -54,16 +73,15 @@ function sizeCue(heightFt) {
   return '';
 }
 
+// creatures.js already builds a trademark-safe, per-type visual
+// description specifically for this prompt (colors, texture, build - see
+// its TYPE_VISUAL_STYLE table) - use it directly rather than maintaining a
+// second, independent "make up a visual" code path here. Two files each
+// guessing at how to describe a creature safely is exactly how this
+// project ended up with a species-recognizable prompt in the first place.
 function creatureVisualLine(creature) {
-  const typeLabel = creature.secondaryType
-    ? `${creature.primaryType.name}/${creature.secondaryType.name}-type`
-    : `${creature.primaryType.name}-type`;
-  const article = /^[aeiou]/i.test(creature.primaryType.name) ? 'an' : 'a';
-  const categoryLabel = creature.category ? ` (the ${creature.category})` : '';
-  return (
-    `the real Pokemon ${creature.name}${categoryLabel}, ${article} ${typeLabel} creature, ` +
-    `${sizeCue(creature.height)}rendered accurately and recognizably as its actual species design`
-  );
+  const desc = creature.visualDescription.replace(/\.\s*$/, '');
+  return `${sizeCue(creature.height)}${desc}`;
 }
 
 function buildPosterPrompt(creatureA, creatureB, arena) {
@@ -75,7 +93,7 @@ function buildPosterPrompt(creatureA, creatureB, arena) {
     : 'The battle takes place in a dramatic, elemental landscape.';
 
   return (
-    `Epic fantasy creature-battle poster art, single unified cinematic scene, ` +
+    `Epic anime creature-battle poster art, single unified cinematic scene, ` +
     `low-angle dynamic action shot, rule-of-thirds composition, both creatures ` +
     `mid-clash charging toward each other from opposite sides. ` +
     `${arenaLine} ` +
@@ -83,12 +101,16 @@ function buildPosterPrompt(creatureA, creatureB, arena) {
     `color ${creatureA.primaryType.color}, matching its ${creatureA.primaryType.name} energy. ` +
     `On the right, facing off against them: ${creatureVisualLine(creatureB)}. Rim-lit with a glowing ` +
     `aura of color ${creatureB.primaryType.color}, matching its ${creatureB.primaryType.name} energy. ` +
-    `Bold modern flat-vector illustration style, like a tech-editorial or news-explainer ` +
-    `podcast cover, not photorealistic painting. Thick clean outlines, vibrant saturated ` +
-    `color blocking, high-contrast graphic silhouettes, minimal fine surface detail, ` +
-    `strong poster-thumbnail readability even at small size, dynamic diagonal composition, ` +
-    `sense of motion and impact between the two subjects. Keep the upper third of the frame ` +
-    `relatively open and uncluttered. ` +
+    `Japanese anime illustration style, in the spirit of a monster-collecting ` +
+    `trading-card-game key visual - vibrant saturated color, cel-shaded ` +
+    `rendering, bold clean linework, expressive dynamic poses, glossy ` +
+    `highlight accents, painterly anime backgrounds with dramatic sky and ` +
+    `light rays, not photorealistic and not a mechanical/armored design - ` +
+    `creatures should read as living, organic beings. High-contrast anime ` +
+    `lighting, strong poster-thumbnail readability even at small size, ` +
+    `dynamic diagonal composition, sense of motion and impact between the ` +
+    `two subjects. Keep the upper third of the frame relatively open and ` +
+    `uncluttered. ` +
     `No text, no logos, no watermarks, no borders, no split-screen.`
   ).slice(0, 2000);
 }

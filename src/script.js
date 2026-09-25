@@ -222,11 +222,15 @@ const blowoutAsides = [
   () => `Quick work tonight. We will see a closer one soon enough.`
 ];
 
-const blowoutSignoffRecaps = [
-  (winner) => `${winner} came in with the advantage and never let the question get asked.`,
-  (winner) => `Nothing complicated about it - ${winner} was the stronger fighter and proved it immediately.`,
-  (winner) => `${winner} did exactly what the numbers said it would do.`
-];
+// REMOVED 2026-08-22 (Episode 38 review): blowoutSignoffRecaps used to
+// supply this beat's recap line on a blowout - "came in with the advantage
+// and never let the question get asked" - which restates the exact claim
+// battleBeats already made two beats earlier via blowoutVictoryColorNotes
+// ("did not give a single opening to work with"). Both banks independently
+// assert "this was one-sided" with no awareness of each other, which is
+// what produced Episode 38's four consecutive one-sided-restating
+// sentences. signoffBeats() below no longer manufactures a second
+// dominance claim - see the blowout branch there.
 
 const statInsightPhrases = [
   (winner, statName) => `${winner} simply outclassed the field in ${statName} tonight, and it showed.`,
@@ -607,13 +611,25 @@ function signoffBeats(showName, winner, exclude, used, conditions, winnerCreatur
   if (!winner) {
     recap = `What a battle. A wild one to end on today.`;
   } else if (blowout) {
-    recap = `${pick(blowoutSignoffRecaps)(winnerSpeakable)}${environmentalCommentary}`;
+    // battleBeats already made the case for why this was decisive
+    // (blowoutVictoryColorNotes + the stat/miss note from decisiveStatNote).
+    // This beat's job now is to add something NEW - environmental flavor if
+    // there is any - rather than restate "it was one-sided" a third or
+    // fourth time. When there's no environmental flavor to add, this beat
+    // contributes nothing of its own and just carries the aside below.
+    recap = environmentalCommentary ? environmentalCommentary.trim() : '';
   } else {
     recap = `What a battle. ${winnerSpeakable} fought smart, fought hard, and tonight fought to win.${environmentalCommentary}`;
   }
 
+  // Join with the aside via filter(Boolean) rather than a hardcoded
+  // template - on a blowout, recap may now be an empty string, and a plain
+  // `${recap} ${aside.item()}` would leave a leading space / empty-looking
+  // beat.
+  const wrapText = [recap, aside.item()].filter((s) => s && s.trim().length).join(' ');
+
   return [
-    { speaker: 'narrator', text: `${recap} ${aside.item()}` },
+    { speaker: 'narrator', text: wrapText },
     { speaker: 'narrator', text: final.item(showName) }
   ];
 }
@@ -629,7 +645,31 @@ function signoffBeats(showName, winner, exclude, used, conditions, winnerCreatur
 // so that a pre-weighted arena variant is used instead of being randomly generated here.
 export function buildEpisodeScript({ showName, episodeNumber, dateStr, creatureA, creatureB, battleResult, exclude = {}, preGeneratedArena = null, conditions = null }) {
   const trainerA = generateTrainer(exclude.trainerA || {});
-  const trainerB = generateTrainer(exclude.trainerB || {});
+  let trainerB = generateTrainer(exclude.trainerB || {});
+
+  // Episode 38: trainerA and trainerB independently drew the identical
+  // background AND the identical quirk ("quiet farming town rarely
+  // mentioned outside regional news" / "carries a small, unrelated
+  // good-luck trinket to every match") in the SAME episode. exclude.trainerA
+  // and exclude.trainerB only de-duplicate each trainer against PAST
+  // episodes - nothing checks the two trainers against each other within
+  // one episode, since generateTrainer has no idea a sibling trainer is
+  // being generated in the same call. Retry trainerB a few times if it
+  // collides with trainerA on any of the three flavor fields. Capped
+  // rather than looped forever, in case a heavily-excluded pool genuinely
+  // can't produce a non-colliding result - an occasional rare collision is
+  // a far better failure mode than an infinite loop.
+  const MAX_TRAINER_RETRY = 5;
+  let trainerRetries = 0;
+  while (
+    trainerRetries < MAX_TRAINER_RETRY &&
+    (trainerB.background === trainerA.background ||
+      trainerB.hometown === trainerA.hometown ||
+      trainerB.quirk === trainerA.quirk)
+  ) {
+    trainerB = generateTrainer(exclude.trainerB || {});
+    trainerRetries++;
+  }
 
   // If preGeneratedArena is provided (from index.js Tier 1-2), use it;
   // otherwise, generate one normally. This keeps backwards compatibility.
