@@ -129,13 +129,19 @@ function seedFromNames(creatureA, creatureB, arenaName) {
 
 async function generatePosterOnce(creatureA, creatureB, arena, env) {
   const prompt = buildPosterPrompt(creatureA, creatureB, arena);
-  const response = await env.AI.run('@cf/leonardo/lucid-origin', {
-    prompt,
-    width: 1216,
-    height: 1216,
-    guidance: 7,
-    num_steps: 30,
-    seed: seedFromNames(creatureA, creatureB, arena?.name)
+  // CHANGED 2026-10-08 (t17): lucid-origin -> flux-2-klein-4b. FLUX.2 models
+  // take multipart form-data, not JSON; klein is distilled, so no guidance or
+  // steps. A test call on Oct 8 returned { image: <base64 JPEG> } at 1216x1216
+  // and accepted seed. To revert, restore the lucid-origin JSON call
+  // (prompt, width/height 1216, guidance 7, num_steps 30, seed).
+  const form = new FormData();
+  form.append('prompt', prompt);
+  form.append('width', '1216');
+  form.append('height', '1216');
+  form.append('seed', String(seedFromNames(creatureA, creatureB, arena?.name)));
+  const packed = new Response(form);
+  const response = await env.AI.run('@cf/black-forest-labs/flux-2-klein-4b', {
+    multipart: { body: packed.body, contentType: packed.headers.get('content-type') }
   });
   const binaryString = atob(response.image);
   const bytes = Uint8Array.from(binaryString, (c) => c.codePointAt(0));
