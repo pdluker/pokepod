@@ -6,7 +6,7 @@
     "binding": "AI"
   },
   "triggers": {
-    "crons": ["0 9 1 * *"]
+    "crons": []
   },
   "r2_buckets": [
     {
